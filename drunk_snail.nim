@@ -29,8 +29,7 @@ proc rendered(line: Line, params: Table): string =
         continue
       result &= params[e.name]
     b = e.boundaries.b + 1
-  if b != len(line.source)-1:
-    result &= line.source[b .. ^1]
+  result &= line.source[b .. ^1]
 
 let parsed_line = new_line("one <!-- (param)p1 --> two <!-- (param)p2 --> three")
 do_assert rendered(parsed_line, {"p1": "v1", "p2": "v2"}.toTable) == "one v1 two v2 three"
