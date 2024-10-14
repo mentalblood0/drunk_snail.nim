@@ -1,6 +1,5 @@
 import std/tables
 import std/strutils
-import std/options
 
 import regex
 
@@ -23,19 +22,25 @@ type Templates* = Table[string, Template]
 type
   Params* = Table[string, Value]
   ValueKind = enum
-    pvkValuesList
-    pvkParamsList
+    vkValuesList
+    vkParamsList
 
   Value = ref ValueObj
   ValueObj = object
     case kind: ValueKind
-    of pvkValuesList: values_list: seq[string]
-    of pvkParamsList: params_list: seq[Params]
+    of vkValuesList: values_list: seq[string]
+    of vkParamsList: params_list: seq[Params]
+
+proc values_list(l: seq[string]): Value =
+  Value(kind: vkValuesList, values_list: l)
+
+proc params_list(l: seq[Params]): Value =
+  Value(kind: vkParamsList, params_list: l)
 
 proc len(v: Value): int =
-  if v.kind == pvkValuesList:
+  if v.kind == vkValuesList:
     return len(v.values_list)
-  if v.kind == pvkParamsList:
+  if v.kind == vkParamsList:
     return len(v.params_list)
 
 proc new_line(line: string): Line =
@@ -80,11 +85,21 @@ proc rendered(
       if e.boundaries.a > 0:
         result &= line.source[b ..< e.boundaries.a]
       if e.operator == "param":
-        if not (e.optional and ((not (e.name in params)) or (len(params[e.name]) == 0))):
-          result &= params[e.name][i]
+        if not (
+          e.optional and (
+            (not (e.name in params)) or (len(params[e.name]) == 0) or
+            (params[e.name].kind != vkValuesList)
+          )
+        ):
+          result &= params[e.name].values_list[i]
       elif e.operator == "ref":
         if not (e.optional and not (e.name in templates)):
-          result &= rendered(templates[e.name], params, templates)
+          let sub_params = block:
+            if e.name in params:
+              params[e.name].params_list[i]
+            else:
+              init_table[string, Value]()
+          result &= rendered(templates[e.name], sub_params, templates)
       b = e.boundaries.b + 1
     result &= line.source[b .. ^1] & external.right
 
@@ -115,15 +130,20 @@ proc test(
 test(
   "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
   "one v1 two v2 three",
-  {"p1": @["v1"], "p2": @["v2"]}.to_table,
+  {
+    "p1": Value(kind: vkValuesList, values_list: @["v1"]),
+    "p2": Value(kind: vkValuesList, values_list: @["v2"]),
+  }.to_table,
 )
 test(
-  "one <!-- (param)p1 --> two", "one v1 two\none v2 two", {"p1": @["v1", "v2"]}.to_table
+  "one <!-- (param)p1 --> two",
+  "one v1 two\none v2 two",
+  {"p1": values_list @["v1", "v2"]}.to_table,
 )
 test(
   "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
   "one v1 two v2 three\none v3 two v4 three",
-  {"p1": @["v1", "v3"], "p2": @["v2", "v4", "v5"]}.to_table,
+  {"p1": values_list @["v1", "v3"], "p2": values_list @["v2", "v4", "v5"]}.to_table,
 )
 test("one <!-- (optional)(param)p1 --> two", "one  two")
 test(
