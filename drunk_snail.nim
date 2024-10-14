@@ -151,3 +151,15 @@ test(
   "one three two",
   templates = {"r": new_template("three")}.to_table,
 )
+test(
+  "one <!-- (ref)r --> two",
+  "one three two",
+  {"r": params_list @[{"p": values_list @["three"]}.to_table]}.to_table,
+  {"r": new_template "<!-- (param)p -->"}.to_table,
+)
+# test(
+#   "one <!-- (ref)r --> two",
+#   "one three two\none four two",
+#   {"r": params_list @[{"p": values_list @["three", "four"]}.to_table]}.to_table,
+#   {"r": new_template "<!-- (param)p -->"}.to_table,
+# )
