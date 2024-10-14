@@ -8,7 +8,7 @@ const open = "<!--"
 const close = "-->"
 
 const expression_regex = re2("(?P<open>" & open &
-    r") *\((?P<operator>[A-Za-z]+)\)(?P<name>[A-Za-z0-9]+) *(?P<close>" &
+    r") *(?:\((?P<optional>optional)\))?\((?P<operator>[A-Za-z]+)\)(?P<name>[A-Za-z0-9]+) *(?P<close>" &
     close & r")")
 
 type Expression = tuple[boundaries: Slice[system.int], optional: bool,
@@ -18,23 +18,26 @@ type Template = tuple[lines: seq[Line]]
 
 proc new_line(line: string): Line =
   for m in find_all(line, expression_regex):
-    result.expressions.add((boundaries: m.boundaries, optional: false,
-        operator: line[m.group("operator")], name: line[m.group("name")]))
+    result.expressions.add((boundaries: m.boundaries, optional: len(line[
+        m.group("optional")]) > 0, operator: line[m.group("operator")],
+            name: line[m.group("name")]))
   result.source = line
 
 template render_expression(i: int) =
   if e.boundaries.a > 0: result &= line.source[b ..< e.boundaries.a]
   if e.operator == "param":
-    if e.optional and not (e.name in params):
-      continue
-    result &= params[e.name][i]
+    if not (e.optional and ((not (e.name in params)) or (len(params[e.name]) == 0))):
+      result &= params[e.name][i]
+  b = e.boundaries.b + 1
 
 proc rendered(line: Line, params: Table): string =
   let min_len = block:
-    var r = 0
+    var r = 1
     for i, e in line.expressions:
+      if e.optional or not (e.name in params):
+        continue
       let n = len(params[e.name])
-      if r == 0 or n < r:
+      if r == 1 or n < r:
         r = n
     r
   for i in 0 ..< min_len:
@@ -43,7 +46,6 @@ proc rendered(line: Line, params: Table): string =
     var b = 0
     for e in line.expressions:
       render_expression i
-      b = e.boundaries.b + 1
     result &= line.source[b .. ^1]
 
 proc new_template(text: string): Template =
@@ -62,7 +64,8 @@ proc test(t: string, params: Table, expect: string) =
     echo "\"", r, "\" != \"", expect, "\""
 
 test("one <!-- (param)p1 --> two <!-- (param)p2 --> three", {"p1": @["v1"],
-    "p2": @["v2"]}.toTable, "one v1 two v2 three")
-test("one <!-- (param)p1 --> two", {"p1": @["v1", "v2"]}.toTable, "one v1 two\none v2 two")
+    "p2": @["v2"]}.to_table, "one v1 two v2 three")
+test("one <!-- (param)p1 --> two", {"p1": @["v1", "v2"]}.to_table, "one v1 two\none v2 two")
 test("one <!-- (param)p1 --> two <!-- (param)p2 --> three", {"p1": @["v1",
-    "v3"], "p2": @["v2", "v4", "v5"]}.toTable, "one v1 two v2 three\none v3 two v4 three")
+    "v3"], "p2": @["v2", "v4", "v5"]}.to_table, "one v1 two v2 three\none v3 two v4 three")
+test("one <!-- (optional)(param)p1 --> two", init_table[string, string](), "one  two")
