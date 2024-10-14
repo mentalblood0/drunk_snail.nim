@@ -23,13 +23,6 @@ proc new_line(line: string): Line =
             name: line[m.group("name")]))
   result.source = line
 
-template render_expression(i: int) =
-  if e.boundaries.a > 0: result &= line.source[b ..< e.boundaries.a]
-  if e.operator == "param":
-    if not (e.optional and ((not (e.name in params)) or (len(params[e.name]) == 0))):
-      result &= params[e.name][i]
-  b = e.boundaries.b + 1
-
 proc rendered(line: Line, params: Table): string =
   let min_len = block:
     var r = 1
@@ -45,7 +38,12 @@ proc rendered(line: Line, params: Table): string =
       result &= '\n'
     var b = 0
     for e in line.expressions:
-      render_expression i
+      if e.boundaries.a > 0: result &= line.source[b ..< e.boundaries.a]
+      if e.operator == "param":
+        if not (e.optional and ((not (e.name in params)) or (len(params[
+            e.name]) == 0))):
+          result &= params[e.name][i]
+      b = e.boundaries.b + 1
     result &= line.source[b .. ^1]
 
 proc new_template(text: string): Template =
