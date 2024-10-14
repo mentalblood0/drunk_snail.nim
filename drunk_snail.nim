@@ -130,10 +130,7 @@ proc test(
 test(
   "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
   "one v1 two v2 three",
-  {
-    "p1": Value(kind: vkValuesList, values_list: @["v1"]),
-    "p2": Value(kind: vkValuesList, values_list: @["v2"]),
-  }.to_table,
+  {"p1": values_list @["v1"], "p2": values_list @["v2"]}.to_table,
 )
 test(
   "one <!-- (param)p1 --> two",
