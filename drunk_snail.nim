@@ -14,6 +14,7 @@ const expression_regex = re2("(?P<open>" & open &
 type Expression = tuple[boundaries: Slice[system.int], optional: bool,
     operator: string, name: string]
 type Line = tuple[source: string, expressions: seq[Expression]]
+type External = tuple[left: string, right: string]
 type Template* = tuple[lines: seq[Line]]
 type Params* = Table[string, seq[string]]
 type Templates* = Table[string, Template]
@@ -29,7 +30,8 @@ proc rendered*(t: Template, params: Params = Params(init_table[string, seq[
     string]]()), templates: Templates = Templates(init_table[string,
         Template]())): string
 
-proc rendered(line: Line, params: Params, templates: Templates): string =
+proc rendered(line: Line, params: Params, templates: Templates,
+    external: External = ("", "")): string =
   let min_len = block:
     var r = 1
     for i, e in line.expressions:
@@ -45,6 +47,7 @@ proc rendered(line: Line, params: Params, templates: Templates): string =
   for i in 0 ..< min_len:
     if i != 0:
       result &= '\n'
+    result &= external.left
     var b = 0
     for e in line.expressions:
       if e.boundaries.a > 0: result &= line.source[b ..< e.boundaries.a]
@@ -56,7 +59,7 @@ proc rendered(line: Line, params: Params, templates: Templates): string =
         if not (e.optional and not (e.name in templates)):
           result &= rendered(templates[e.name], params, templates)
       b = e.boundaries.b + 1
-    result &= line.source[b .. ^1]
+    result &= line.source[b .. ^1] & external.right
 
 proc new_template(text: string): Template =
   for l in split_lines text:
