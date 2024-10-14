@@ -15,6 +15,12 @@ type Expression = tuple[boundaries: Slice[system.int], optional: bool,
     operator: string, name: string]
 type Line = tuple[source: string, expressions: seq[Expression]]
 type Template = tuple[lines: seq[Line]]
+type Params = Table[string, seq[string]]
+type Templates = Table[string, Template]
+proc init_params(p: Params = init_table[string, seq[string]]()): Params =
+  return p
+proc init_templates(t: Templates = init_table[string, Template]()): Templates =
+  return t
 
 proc new_line(line: string): Line =
   for m in find_all(line, expression_regex):
@@ -23,12 +29,15 @@ proc new_line(line: string): Line =
             name: line[m.group("name")]))
   result.source = line
 
-proc rendered(line: Line, params: Table): string =
+proc rendered(line: Line, params: Params, templates: Templates): string =
   let min_len = block:
     var r = 1
     for i, e in line.expressions:
       if e.optional or not (e.name in params):
         continue
+      if e.operator == "template":
+        r = 0
+        break
       let n = len(params[e.name])
       if r == 1 or n < r:
         r = n
@@ -43,6 +52,9 @@ proc rendered(line: Line, params: Table): string =
         if not (e.optional and ((not (e.name in params)) or (len(params[
             e.name]) == 0))):
           result &= params[e.name][i]
+      elif e.operator == "template":
+        if not (e.optional and not (e.name in templates)):
+          result &= rendered(templates[e.name], params, templates)
       b = e.boundaries.b + 1
     result &= line.source[b .. ^1]
 
@@ -50,20 +62,24 @@ proc new_template(text: string): Template =
   for l in split_lines text:
     result.lines.add new_line l
 
-proc rendered(t: Template, params: Table): string =
+proc rendered(t: Template, params: Params = init_params(),
+    templates: Templates = init_templates()): string =
   for i, l in t.lines:
     if i != 0:
       result &= '\n'
-    result &= rendered(l, params)
+    result &= rendered(l, params, templates)
 
-proc test(t: string, params: Table, expect: string) =
+proc test(t: string, expect: string, params: Params = init_params(),
+    templates: Templates = init_templates()) =
   let r = rendered(new_template t, params)
   if r != expect:
     echo "\"", r, "\" != \"", expect, "\""
 
-test("one <!-- (param)p1 --> two <!-- (param)p2 --> three", {"p1": @["v1"],
-    "p2": @["v2"]}.to_table, "one v1 two v2 three")
-test("one <!-- (param)p1 --> two", {"p1": @["v1", "v2"]}.to_table, "one v1 two\none v2 two")
-test("one <!-- (param)p1 --> two <!-- (param)p2 --> three", {"p1": @["v1",
-    "v3"], "p2": @["v2", "v4", "v5"]}.to_table, "one v1 two v2 three\none v3 two v4 three")
-test("one <!-- (optional)(param)p1 --> two", init_table[string, string](), "one  two")
+test("one <!-- (param)p1 --> two <!-- (param)p2 --> three",
+    "one v1 two v2 three", {"p1": @["v1"], "p2": @["v2"]}.to_table)
+test("one <!-- (param)p1 --> two", "one v1 two\none v2 two", {"p1": @["v1",
+    "v2"]}.to_table)
+test("one <!-- (param)p1 --> two <!-- (param)p2 --> three",
+    "one v1 two v2 three\none v3 two v4 three", {"p1": @["v1", "v3"], "p2": @[
+        "v2", "v4", "v5"]}.to_table)
+test("one <!-- (optional)(param)p1 --> two", "one  two")
