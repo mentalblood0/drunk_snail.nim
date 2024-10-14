@@ -16,8 +16,17 @@ type Expression = tuple[boundaries: Slice[system.int], optional: bool,
 type Line = tuple[source: string, expressions: seq[Expression]]
 type External = tuple[left: string, right: string]
 type Template* = tuple[lines: seq[Line]]
-type Params* = Table[string, seq[string]]
 type Templates* = Table[string, Template]
+type
+  Params* = Table[string, Value]
+  ValueKind = enum
+    pvkValuesList,
+    pvkParamsList
+  Value = ref ValueObj
+  ValueObj = object
+    case kind: ValueKind
+    of pvkValuesList: values_list: seq[string]
+    of pvkParamsList: params_list: seq[Params]
 
 proc new_line(line: string): Line =
   for m in find_all(line, expression_regex):
@@ -26,9 +35,8 @@ proc new_line(line: string): Line =
             name: line[m.group("name")]))
   result.source = line
 
-proc rendered*(t: Template, params: Params = Params(init_table[string, seq[
-    string]]()), templates: Templates = Templates(init_table[string,
-        Template]())): string
+proc rendered*(t: Template, params: Params = Params(init_table[string, Value](
+    )), templates: Templates = Templates(init_table[string, Template]())): string
 
 proc rendered(line: Line, params: Params, templates: Templates,
     external: External = ("", "")): string =
@@ -65,17 +73,15 @@ proc new_template(text: string): Template =
   for l in split_lines text:
     result.lines.add new_line l
 
-proc rendered*(t: Template, params: Params = Params(init_table[string, seq[
-    string]]()), templates: Templates = Templates(init_table[string,
-        Template]())): string =
+proc rendered*(t: Template, params: Params = Params(init_table[string, Value](
+    )), templates: Templates = Templates(init_table[string, Template]())): string =
   for i, l in t.lines:
     if i != 0:
       result &= '\n'
     result &= rendered(l, params, templates)
 
 proc test(t: string, expect: string, params: Params = Params(init_table[string,
-    seq[string]]()), templates: Templates = Templates(init_table[string,
-        Template]())) =
+    Value]()), templates: Templates = Templates(init_table[string, Template]())) =
   let r = rendered(new_template t, params, templates)
   if r != expect:
     echo "\"", r, "\" != \"", expect, "\""
