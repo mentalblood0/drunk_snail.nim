@@ -31,19 +31,19 @@ type
     of vkValuesList: values_list: seq[string]
     of vkParamsList: params_list: seq[Params]
 
-proc values_list(l: seq[string]): Value =
+func values_list(l: seq[string]): Value =
   Value(kind: vkValuesList, values_list: l)
 
-proc params_list(l: seq[Params]): Value =
+func params_list(l: seq[Params]): Value =
   Value(kind: vkParamsList, params_list: l)
 
-proc len(v: Value): int =
+func len(v: Value): int =
   if v.kind == vkValuesList:
     return len(v.values_list)
   if v.kind == vkParamsList:
     return len(v.params_list)
 
-proc new_line(line: string): Line =
+func new_line(line: string): Line =
   for m in find_all(line, expression_regex):
     result.expressions.add(
       (
@@ -55,13 +55,13 @@ proc new_line(line: string): Line =
     )
   result.source = line
 
-proc rendered*(
+func rendered*(
   t: Template,
   params: Params = Params(init_table[string, Value]()),
   templates: Templates = Templates(init_table[string, Template]()),
 ): string
 
-proc rendered(
+func rendered(
     line: Line, params: Params, templates: Templates, external: External = ("", "")
 ): string =
   let min_len = block:
@@ -103,11 +103,11 @@ proc rendered(
       b = e.boundaries.b + 1
     result &= line.source[b .. ^1] & external.right
 
-proc new_template(text: string): Template =
+func new_template(text: string): Template =
   for l in split_lines text:
     result.lines.add new_line l
 
-proc rendered*(
+func rendered*(
     t: Template,
     params: Params = Params(init_table[string, Value]()),
     templates: Templates = Templates(init_table[string, Template]()),
