@@ -20,16 +20,37 @@ proc new_line(line: string): Line =
         operator: line[m.group("operator")], name: line[m.group("name")]))
   result.source = line
 
-proc rendered(line: Line, params: Table): string =
-  var b = 0
-  for e in line.expressions:
-    if e.boundaries.a > 0: result &= line.source[b ..< e.boundaries.a]
-    if e.operator == "param":
-      if e.optional and not (e.name in params):
-        continue
-      result &= params[e.name]
-    b = e.boundaries.b + 1
-  result &= line.source[b .. ^1]
+template render_expression(i: int) =
+  if e.boundaries.a > 0: result &= line.source[b ..< e.boundaries.a]
+  if e.operator == "param":
+    if e.optional and not (e.name in params):
+      continue
+    result &= params[e.name][i]
 
-let parsed_line = new_line("one <!-- (param)p1 --> two <!-- (param)p2 --> three")
-do_assert rendered(parsed_line, {"p1": "v1", "p2": "v2"}.toTable) == "one v1 two v2 three"
+proc rendered(line: Line, params: Table): string =
+  let max_len = block:
+    var r = 0
+    for i, e in line.expressions:
+      let n = len(params[e.name])
+      if r == 0 or n > r:
+        r = n
+    r
+  var b = 0
+  for i in 0 ..< max_len:
+    if i != 0:
+      result &= '\n'
+    var b = 0
+    for e in line.expressions:
+      render_expression(i)
+      b = e.boundaries.b + 1
+    result &= line.source[b .. ^1]
+
+proc test(line: string, params: Table, expect: string) =
+  let r = rendered(new_line(line), params)
+  if r != expect:
+    echo "\"", r, "\" != \"", expect, "\""
+
+test("one <!-- (param)p1 --> two <!-- (param)p2 --> three", {"p1": @["v1"],
+    "p2": @["v2"]}.toTable, "one v1 two v2 three")
+test("one <!-- (param)p1 --> two", {"p1": @["v1", "v2"]}.toTable, "one v1 two\none v2 two")
+
