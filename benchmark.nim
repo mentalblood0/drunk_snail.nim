@@ -3,15 +3,15 @@ import std/times
 
 import drunk_snail as ds
 
-let table = ds.new_template "<table>\n\t<!-- (ref)Row -->\n</table>"
-let templates = {"Row": ds.new_template "<tr>\n\t<td><!-- (param)cell --></td>\n</tr>"}.to_table
+let table = "<table>\n\t<!-- (ref)Row -->\n</table>".new_template
+let templates = {"Row": "<tr>\n\t<td><!-- (param)cell --></td>\n</tr>".new_template}.to_table
 
 proc benchmark_table(size: int, n: int) =
 
   let params = block:
-    var r = {"Row": ds.params_list @[]}.to_table
+    var r = {"Row": @[].params_list}.to_table
     for y in 0 .. size:
-      var rc = {"cell": ds.values_list @[]}.to_table
+      var rc = {"cell": @[].values_list}.to_table
       for x in 0 .. size:
         rc["cell"].values_list.add $(x + y * size)
       r["Row"].params_list.add rc
@@ -19,7 +19,7 @@ proc benchmark_table(size: int, n: int) =
 
   let start_time = cpu_time()
   for i in 0 ..< n:
-    discard ds.rendered(table, params, templates)
+    discard table.rendered(params, templates)
   let end_time = cpu_time()
   echo "rendered " & $size & "x" & $size & " table in " & $(
       (end_time - start_time) / n.float) & " seconds (cpu time mean of " & $n & " experiments)"
