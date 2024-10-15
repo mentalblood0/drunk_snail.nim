@@ -10,9 +10,9 @@ proc benchmark_table(size: int, n: int) =
 
   let params = block:
     var r = {"Row": @[].params_list}.to_table
-    for y in 0 .. size:
+    for y in 0 ..< size:
       var rc = {"cell": @[].values_list}.to_table
-      for x in 0 .. size:
+      for x in 0 ..< size:
         rc["cell"].values_list.add $(x + y * size)
       r["Row"].params_list.add rc
     r
