@@ -8,14 +8,12 @@ const close = "-->"
 
 func expression_regex(operator: static string): auto =
   return re2(
-    "(?P<open>" & open &
-      r") *(?:\((?P<optional>optional)\))?\((?P<operator>" & operator &
-    r")\)(?P<name>[A-Za-z0-9]+) *(?P<close>" &
-      close & r")"
+    open & r" *(?P<optional>\(optional\))?\(" & operator &
+    r"\)(?P<name>[A-Za-z0-9]+) *" & close
   )
 
-const param_regex = expression_regex("param")
-const ref_regex = expression_regex("ref")
+const param_regex = expression_regex "param"
+const ref_regex = expression_regex "ref"
 
 type
   Expression = tuple[name: string, optional: bool]
