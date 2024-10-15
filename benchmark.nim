@@ -22,7 +22,6 @@ proc benchmark_table(size: int, n: int) =
     discard ds.rendered(table, params, templates)
   let end_time = cpu_time()
   echo "rendered " & $size & "x" & $size & " table in " & $(
-      (end_time - start_time) / n.float) & " seconds"
+      (end_time - start_time) / n.float) & " seconds (cpu time mean of " & $n & " experiments)"
 
 benchmark_table(100, 100)
-
