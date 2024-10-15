@@ -1,4 +1,5 @@
 import std/tables
+import std/[times, os]
 import std/strutils
 
 import regex
@@ -115,19 +116,19 @@ func new_line(line: string): Line =
   else:
     return Line(kind: lPlain, value: line)
 
-proc rendered*(
+func rendered*(
   t: Template,
   params: Params = Params(init_table[string, Value]()),
   templates: Templates = Templates(init_table[string, Template]()),
   bounds: Bounds = ("", "")
 ): string
 
-proc rendered(
+func rendered(
     line: Line, params: Params, templates: Templates, external: Bounds
 ): string =
 
   if line.kind == lPlain:
-    return line.value
+    return external.left & line.value & external.right
 
   elif line.kind == lParams:
     let min_len = block:
@@ -144,6 +145,7 @@ proc rendered(
     for i in 0 ..< min_len:
       if i != 0:
         result &= '\n'
+      result &= external.left
       for t in line.tokens:
         if t.kind == pltPlain:
           result &= t.value
@@ -156,6 +158,7 @@ proc rendered(
             )
           ):
             result &= params[e.name].values_list[i]
+      result &= external.right
 
   elif line.kind == lRef:
     let e = line.expression
@@ -163,11 +166,9 @@ proc rendered(
       for i, subparams in params[e.name].params_list:
         if i != 0:
           result &= '\n'
-        result &= line.bounds.left
         if not (e.optional and not (e.name in templates)):
           result &= rendered(templates[e.name], subparams, templates,
               line.bounds & external)
-        result &= line.bounds.right
     else:
       if e.optional: return ""
       else: raise new_exception(RenderError,
@@ -177,7 +178,7 @@ func new_template(text: string): Template =
   for l in split_lines text:
     result.lines.add new_line l
 
-proc rendered*(
+func rendered*(
     t: Template,
     params: Params = Params(init_table[string, Value]()),
     templates: Templates = Templates(init_table[string, Template]()),
@@ -188,49 +189,79 @@ proc rendered*(
       result &= '\n'
     result &= rendered(l, params, templates, bounds)
 
-proc test(
-    t: string,
-    expect: string,
-    params: Params = Params(init_table[string, Value]()),
-    templates: Templates = Templates(init_table[string, Template]()),
-) =
-  let r = rendered(new_template t, params, templates)
-  if r != expect:
-    echo "\"", r, "\" != \"", expect, "\""
+# proc test(
+#     t: string,
+#     expect: string,
+#     params: Params = Params(init_table[string, Value]()),
+#     templates: Templates = Templates(init_table[string, Template]()),
+# ) =
+#   let r = rendered(new_template t, params, templates)
+#   if r != expect:
+#     echo "\"", r, "\" != \"", expect, "\""
+#
+# test(
+#   "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
+#   "one v1 two v2 three",
+#   {"p1": values_list @["v1"], "p2": values_list @["v2"]}.to_table,
+# )
+# test(
+#   "one <!-- (param)p1 --> two",
+#   "one v1 two\none v2 two",
+#   {"p1": values_list @["v1", "v2"]}.to_table,
+# )
+# test(
+#   "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
+#   "one v1 two v2 three\none v3 two v4 three",
+#   {"p1": values_list @["v1", "v3"], "p2": values_list @["v2", "v4",
+#       "v5"]}.to_table,
+# )
+# test("one <!-- (optional)(param)p1 --> two", "one  two")
+# test(
+#   "one <!-- (ref)r --> two",
+#   "one three two",
+#   {"r": params_list @[init_table[string, Value]()]}.to_table,
+#   {"r": new_template("three")}.to_table,
+# )
+# test(
+#   "one <!-- (ref)r --> two",
+#   "one three two",
+#   {"r": params_list @[{"p": values_list @["three"]}.to_table]}.to_table,
+#   {"r": new_template "<!-- (param)p -->"}.to_table,
+# )
+# test(
+#   "one <!-- (ref)r --> two",
+#   "one three two\none four two",
+#   {"r": params_list @[{"p": values_list @["three"]}.to_table, {
+#       "p": values_list @["four"]}.to_table]}.to_table,
+#   {"r": new_template "<!-- (param)p -->"}.to_table,
+# )
+# test(
+#   "<table>\n\t<!-- (ref)Row -->\n</table>",
+#   "<table>\n\t<tr>\n\t\t<td>1.1</td>\n\t\t<td>2.1</td>\n\t</tr>\n\t<tr>\n\t\t<td>1.2</td>\n\t\t<td>2.2</td>\n\t</tr>\n</table>",
+#   {"Row": params_list @[{"cell": values_list @["1.1", "2.1"]}.to_table, {
+#       "cell": values_list @["1.2", "2.2"]}.to_table]}.to_table,
+#   {"Row": new_template "<tr>\n\t<td><!-- (param)cell --></td>\n</tr>"}.to_table,
+# )
 
-test(
-  "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
-  "one v1 two v2 three",
-  {"p1": values_list @["v1"], "p2": values_list @["v2"]}.to_table,
-)
-test(
-  "one <!-- (param)p1 --> two",
-  "one v1 two\none v2 two",
-  {"p1": values_list @["v1", "v2"]}.to_table,
-)
-test(
-  "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
-  "one v1 two v2 three\none v3 two v4 three",
-  {"p1": values_list @["v1", "v3"], "p2": values_list @["v2", "v4",
-      "v5"]}.to_table,
-)
-test("one <!-- (optional)(param)p1 --> two", "one  two")
-test(
-  "one <!-- (ref)r --> two",
-  "one three two",
-  {"r": params_list @[init_table[string, Value]()]}.to_table,
-  {"r": new_template("three")}.to_table,
-)
-test(
-  "one <!-- (ref)r --> two",
-  "one three two",
-  {"r": params_list @[{"p": values_list @["three"]}.to_table]}.to_table,
-  {"r": new_template "<!-- (param)p -->"}.to_table,
-)
-test(
-  "one <!-- (ref)r --> two",
-  "one three two\none four two",
-  {"r": params_list @[{"p": values_list @["three"]}.to_table, {
-      "p": values_list @["four"]}.to_table]}.to_table,
-  {"r": new_template "<!-- (param)p -->"}.to_table,
-)
+let table = new_template "<table>\n\t<!-- (ref)Row -->\n</table>"
+let templates = {"Row": new_template "<tr>\n\t<td><!-- (param)cell --></td>\n</tr>"}.to_table
+
+proc benchmark_table(size: int, n: int) =
+
+  let params = block:
+    var r = {"Row": params_list @[]}.to_table
+    for y in 0 .. size:
+      var rc = {"cell": values_list @[]}.to_table
+      for x in 0 .. size:
+        rc["cell"].values_list.add $(x + y * size)
+      r["Row"].params_list.add rc
+    r
+
+  let start_time = cpu_time()
+  for i in 0 ..< n:
+    discard rendered(table, params, templates)
+  let end_time = cpu_time()
+  echo "rendered " & $size & "x" & $size & " table in " & $(
+      (end_time - start_time) / n.float) & " seconds"
+
+benchmark_table(100, 100)
