@@ -72,6 +72,7 @@ func new_bounds(line: string, m: regex.RegexMatch2): Bounds = (line[0 ..<
     m.boundaries.a], line[m.boundaries.b + 1 .. ^1])
 
 func `&`(a: Bounds, b: Bounds): Bounds = (b.left & a.left, a.right & b.right)
+func `&`(a: string, b: Bounds): string = b.left & a & b.right
 
 func values_list*(l: seq[string]): Value =
   Value(kind: vkValuesList, values_list: l)
@@ -125,7 +126,7 @@ func rendered(
 ): string =
 
   if line.kind == lPlain:
-    return external.left & line.value & external.right
+    return line.value & external
 
   elif line.kind == lParams:
     let min_len = block:
