@@ -1,5 +1,4 @@
 import std/tables
-import std/[times, os]
 import std/strutils
 
 import regex
@@ -58,11 +57,11 @@ type
     vkValuesList
     vkParamsList
 
-  Value = ref ValueObj
+  Value* = ref ValueObj
   ValueObj = object
-    case kind: ValueKind
-    of vkValuesList: values_list: seq[string]
-    of vkParamsList: params_list: seq[Params]
+    case kind*: ValueKind
+    of vkValuesList: values_list*: seq[string]
+    of vkParamsList: params_list*: seq[Params]
 
   ParseError* = object of ValueError
   RenderError* = object of ValueError
@@ -76,10 +75,10 @@ func new_bounds(line: string, m: regex.RegexMatch2): Bounds = (line[0 ..<
 
 func `&`(a: Bounds, b: Bounds): Bounds = (b.left & a.left, a.right & b.right)
 
-func values_list(l: seq[string]): Value =
+func values_list*(l: seq[string]): Value =
   Value(kind: vkValuesList, values_list: l)
 
-func params_list(l: seq[Params]): Value =
+func params_list*(l: seq[Params]): Value =
   Value(kind: vkParamsList, params_list: l)
 
 func len(v: Value): int =
@@ -174,7 +173,7 @@ func rendered(
       else: raise new_exception(RenderError,
           "Parameters for non-optional subtemplate `" & e.name & "` not provided")
 
-func new_template(text: string): Template =
+func new_template*(text: string): Template =
   for l in split_lines text:
     result.lines.add new_line l
 
@@ -188,80 +187,3 @@ func rendered*(
     if i != 0:
       result &= '\n'
     result &= rendered(l, params, templates, bounds)
-
-# proc test(
-#     t: string,
-#     expect: string,
-#     params: Params = Params(init_table[string, Value]()),
-#     templates: Templates = Templates(init_table[string, Template]()),
-# ) =
-#   let r = rendered(new_template t, params, templates)
-#   if r != expect:
-#     echo "\"", r, "\" != \"", expect, "\""
-#
-# test(
-#   "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
-#   "one v1 two v2 three",
-#   {"p1": values_list @["v1"], "p2": values_list @["v2"]}.to_table,
-# )
-# test(
-#   "one <!-- (param)p1 --> two",
-#   "one v1 two\none v2 two",
-#   {"p1": values_list @["v1", "v2"]}.to_table,
-# )
-# test(
-#   "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
-#   "one v1 two v2 three\none v3 two v4 three",
-#   {"p1": values_list @["v1", "v3"], "p2": values_list @["v2", "v4",
-#       "v5"]}.to_table,
-# )
-# test("one <!-- (optional)(param)p1 --> two", "one  two")
-# test(
-#   "one <!-- (ref)r --> two",
-#   "one three two",
-#   {"r": params_list @[init_table[string, Value]()]}.to_table,
-#   {"r": new_template("three")}.to_table,
-# )
-# test(
-#   "one <!-- (ref)r --> two",
-#   "one three two",
-#   {"r": params_list @[{"p": values_list @["three"]}.to_table]}.to_table,
-#   {"r": new_template "<!-- (param)p -->"}.to_table,
-# )
-# test(
-#   "one <!-- (ref)r --> two",
-#   "one three two\none four two",
-#   {"r": params_list @[{"p": values_list @["three"]}.to_table, {
-#       "p": values_list @["four"]}.to_table]}.to_table,
-#   {"r": new_template "<!-- (param)p -->"}.to_table,
-# )
-# test(
-#   "<table>\n\t<!-- (ref)Row -->\n</table>",
-#   "<table>\n\t<tr>\n\t\t<td>1.1</td>\n\t\t<td>2.1</td>\n\t</tr>\n\t<tr>\n\t\t<td>1.2</td>\n\t\t<td>2.2</td>\n\t</tr>\n</table>",
-#   {"Row": params_list @[{"cell": values_list @["1.1", "2.1"]}.to_table, {
-#       "cell": values_list @["1.2", "2.2"]}.to_table]}.to_table,
-#   {"Row": new_template "<tr>\n\t<td><!-- (param)cell --></td>\n</tr>"}.to_table,
-# )
-
-let table = new_template "<table>\n\t<!-- (ref)Row -->\n</table>"
-let templates = {"Row": new_template "<tr>\n\t<td><!-- (param)cell --></td>\n</tr>"}.to_table
-
-proc benchmark_table(size: int, n: int) =
-
-  let params = block:
-    var r = {"Row": params_list @[]}.to_table
-    for y in 0 .. size:
-      var rc = {"cell": values_list @[]}.to_table
-      for x in 0 .. size:
-        rc["cell"].values_list.add $(x + y * size)
-      r["Row"].params_list.add rc
-    r
-
-  let start_time = cpu_time()
-  for i in 0 ..< n:
-    discard rendered(table, params, templates)
-  let end_time = cpu_time()
-  echo "rendered " & $size & "x" & $size & " table in " & $(
-      (end_time - start_time) / n.float) & " seconds"
-
-benchmark_table(100, 100)
