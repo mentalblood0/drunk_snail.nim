@@ -11,9 +11,9 @@ Uses standard library modules only
 - Easy syntax
 - Separates logic and data
 
-## Why better then drunk snail?
+## Why better then Python / C implementations?
 
-- Memory safe
+- Compiled and statically typed yet memory safe
 - Small codebase
 - Allow for parser configuration
 
