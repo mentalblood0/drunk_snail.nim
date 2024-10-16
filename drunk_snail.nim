@@ -5,22 +5,19 @@ import std/unittest
 import std/sugar
 import std/json
 import std/strutils
-
-import regex
-
-const open = "<!--"
-const close = "-->"
-
-func expression_regex(operator: static string): auto =
-  return re2(
-    open & r" *(?P<optional>\(optional\))?\(" & operator & r"\)(?P<name>[A-Za-z0-9]+) *" &
-      close
-  )
-
-const param_regex = expression_regex "param"
-const ref_regex = expression_regex "ref"
+import std/nre
 
 type
+  Parser* =
+    tuple[
+      open: string,
+      close: string,
+      param: string,
+      `ref`: string,
+      optional: string,
+      param_regex: Regex,
+      ref_regex: Regex,
+    ]
   Expression = tuple[name: string, optional: bool]
   Bounds = tuple[left: string, right: string]
 
@@ -58,20 +55,51 @@ type
   ParseError* = object of ValueError
   RenderError* = object of ValueError
 
-func new_expression(line: string, m: regex.RegexMatch2): Expression =
-  return (name: line[m.group("name")], optional: len(line[m.group("optional")]) > 0)
+func expression_regex(
+    open: string, operator: string, close: string, optional: string
+): auto =
+  return re(
+    escape_re(open) & r" *(?P<optional>\(" & escape_re(optional) & r"\))?\(" &
+      escape_re(operator) & r"\)(?P<name>[A-Za-z0-9]+) *" & escape_re(close)
+  )
 
-func new_bounds(line: string, m: regex.RegexMatch2): Bounds =
-  (line[0 ..< m.boundaries.a], line[m.boundaries.b + 1 .. ^1])
+func new_parser*(
+    open: string = "<!--",
+    close: string = "-->",
+    param: string = "param",
+    `ref`: string = "ref",
+    optional: string = "optional",
+): Parser =
+  (
+    open,
+    close,
+    param,
+    `ref`,
+    optional,
+    expression_regex(open, param, close, optional),
+    expression_regex(open, `ref`, close, optional),
+  )
+
+func new_expression(line: string, m: RegexMatch): Expression =
+  return (name: m.captures["name"], optional: "optional" in m.captures)
+
+func new_bounds(line: string, m: RegexMatch): Bounds =
+  (line[0 ..< m.match_bounds.a], line[m.match_bounds.b + 1 .. ^1])
 
 func `&`(a: Bounds, b: Bounds): Bounds =
   (b.left & a.left, a.right & b.right)
 func `&`(a: string, b: Bounds): string =
   b.left & a & b.right
 
-func new_line(line: string): Line =
-  let refs = find_all(line, ref_regex)
-  let params = find_all(line, param_regex)
+func new_line(parser: Parser, line: string): Line =
+  let refs = collect(
+    for m in line.find_iter(parser.ref_regex):
+      m
+  )
+  let params = collect(
+    for m in line.find_iter(parser.param_regex):
+      m
+  )
   if len(refs) > 1:
     raise new_exception(
       ParseError, "Line `" & line & "` contain more then one reference expressions"
@@ -89,10 +117,10 @@ func new_line(line: string): Line =
     result = Line(kind: lParams)
     var b = 0
     for p in params:
-      let plain = line[b ..< p.boundaries.a]
+      let plain = line[b ..< p.match_bounds.a]
       if len(plain) > 0:
         result.tokens.add ParamLineToken(kind: pltPlain, value: plain)
-      b = p.boundaries.b + 1
+      b = p.match_bounds.b + 1
       result.tokens.add ParamLineToken(
         kind: pltParam, expression: new_expression(line, p)
       )
@@ -161,9 +189,9 @@ func rendered(
           "Parameters for non-optional subtemplate `" & e.name & "` not provided",
         )
 
-func new_template*(text: string): Template =
+func new_template*(text: string, parser: Parser = new_parser()): Template =
   for l in split_lines text:
-    result.lines.add new_line l
+    result.lines.add parser.new_line l
 
 func rendered*(
     t: Template,
@@ -217,30 +245,32 @@ proc test*() =
     %*{"p1": ["v1", "v3"], "p2": ["v2", "v4", "v5"]},
   ) == "one v1 two v2 three\none v3 two v4 three"
 
-  const syntax = (
-    opening: open,
-    close: close,
-    optional: "(optional)",
-    param: "(param)",
-    `ref`: "(ref)",
+  let parser = new_parser()
+
+  let syntax = (
+    opening: parser.open,
+    close: parser.close,
+    optional: "(" & parser.optional & ")",
+    param: "(" & parser.param & ")",
+    `ref`: "(" & parser.`ref` & ")",
   )
 
   type TestLine = ref object
     expression*: string
     name*: string
     bound_left*: string
-    open_tag*: string = syntax.opening
+    open_tag*: string
     gap_left*: string
     flag*: string
     gap_right*: string
-    close_tag*: string = syntax.close
+    close_tag*: string
     bound_right*: string
 
   func join(l: TestLine): string =
     l.bound_left & l.open_tag & l.gap_left & l.flag & l.expression & l.name & l.gap_right &
       l.close_tag & l.bound_right
 
-  const valid = (
+  let valid = (
     other: ["", " ", "la"],
     gap: ["", " ", "  "],
     value: ["", "l", "la", "\n"],
@@ -248,7 +278,7 @@ proc test*() =
     one_line_params_number: [2, 3],
   )
 
-  const invalid = (
+  let invalid = (
     gap: ["l", "la"],
     open_tag: block:
       collect:
@@ -268,6 +298,8 @@ proc test*() =
           for bound_right in concat(@(valid.other), @[syntax.close]):
             let r = rendered(
               new_template TestLine(
+                open_tag: syntax.opening,
+                close_tag: syntax.close,
                 expression: syntax.param,
                 name: "p",
                 bound_left: bound_left,
@@ -307,6 +339,8 @@ proc test*() =
             for bound_right in valid.other:
               let r = rendered(
                 new_template TestLine(
+                  open_tag: syntax.opening,
+                  close_tag: syntax.close,
                   expression: syntax.`ref`,
                   name: "R",
                   bound_left: bound_left,
