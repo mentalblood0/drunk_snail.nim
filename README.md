@@ -2,7 +2,9 @@
 
 <h3 align="center">safe and clean text template engine</h3>
 
-Pure nim implementation of template language originally presented in [drunk snail](https://codeberg.org/mentalblood/drunk_snail)
+Pure [nim](https://nim-lang.org/) implementation of template language originally presented in [drunk snail](https://codeberg.org/mentalblood/drunk_snail)
+
+Uses standard library modules only
 
 ## Why this language?
 
@@ -11,9 +13,9 @@ Pure nim implementation of template language originally presented in [drunk snai
 
 ## Why better then drunk snail?
 
+- Memory safe
 - Small codebase
-- Secure by design
-- Parser configuration
+- Allow for parser configuration
 
 ## Example
 
@@ -65,7 +67,7 @@ Result:
 
 ## Installation
 
-Download and import drunk_snail.nim into your project
+Download and import [drunk_snail.nim](https://codeberg.org/mentalblood/drunk_snail.nim/src/branch/main/drunk_snail.nim) into your project
 
 ## Usage
 
