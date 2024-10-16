@@ -1,7 +1,2 @@
 a.out
 .git
-nimcache
-testresults
-outputGotten.txt
-megatest*
-*.exe

@@ -1,4 +1,6 @@
 import std/tables
+import std/unittest
+import std/sugar
 import std/json
 import std/strutils
 
@@ -174,3 +176,90 @@ func rendered*(
     if i != 0:
       result &= '\n'
     result &= rendered(l, params, templates, bounds)
+
+when is_main_module:
+
+  check rendered(
+    new_template "one <!-- (ref)r --> two",
+    %* {"r": [{}]},
+    {"r": new_template("three")}.to_table,
+  ) == "one three two"
+
+  check rendered(
+    new_template "<table>\n\t<!-- (ref)Row -->\n</table>",
+    %* {"Row": [{"cell": ["1.1", "2.1"]}, {"cell": ["1.2", "2.2"]}]},
+    {"Row": new_template "<tr>\n\t<td><!-- (param)cell --></td>\n</tr>"}.to_table,
+  ) == "<table>\n\t<tr>\n\t\t<td>1.1</td>\n\t\t<td>2.1</td>\n\t</tr>\n\t<tr>\n\t\t<td>1.2</td>\n\t\t<td>2.2</td>\n\t</tr>\n</table>"
+
+  check rendered(new_template "one <!-- (optional)(param)p1 --> two") == "one  two"
+
+  check rendered(
+    new_template "one <!-- (ref)r --> two",
+    %* {"r": [{"p": ["three"]}]},
+    {"r": new_template "<!-- (param)p -->"}.to_table,
+  ) == "one three two"
+
+  check rendered(new_template "one <!-- (param)p1 --> two", %* {"p1": ["v1",
+    "v2"]}) == "one v1 two\none v2 two"
+
+  check rendered(
+    new_template "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
+    %* {"p1": ["v1"], "p2": ["v2"]}) == "one v1 two v2 three"
+
+  check rendered(
+    new_template "one <!-- (ref)r --> two",
+    %* {"r": [{"p": ["three"]}, {"p": ["four"]}]},
+    {"r": new_template "<!-- (param)p -->"}.to_table,
+  ) == "one three two\none four two"
+
+  check rendered(new_template "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
+      %*{"p1": ["v1", "v3"], "p2": ["v2", "v4", "v5"]}) == "one v1 two v2 three\none v3 two v4 three"
+
+  const syntax* = (opening: open, close: close, optional: "(optional)",
+      param: "(param)", `ref`: "(ref)")
+
+  type TestLine* = ref object
+    expression*: string
+    name*: string
+    bound_left*: string
+    open_tag*: string = syntax.opening
+    gap_left*: string
+    flag*: string
+    gap_right*: string
+    close_tag*: string = syntax.close
+    bound_right*: string
+
+  func join*(l: TestLine): string = l.bound_left & l.open_tag & l.gap_left & l.flag &
+          l.expression & l.name & l.gap_right & l.close_tag & l.bound_right
+
+  const valid* = (other: ["", " ", "la"], gap: ["", " ", "  "], value: ["", "l",
+      "la", "\n"], `ref`: [syntax.opening & syntax.param & "p" &
+          syntax.close], one_line_params_number: [2, 3])
+
+  const invalid* = (gap: ["l", "la"],
+    open_tag: block: collect:
+      for n in 1 .. len(syntax.opening):
+        syntax.opening[0 ..< n],
+    close_tag: block: collect:
+      for n in 1 .. len(syntax.close):
+        syntax.close[0 ..< n],
+    name: ["1", "-", "1l"]
+  )
+
+  for value in valid.value:
+    for bound_left in valid.other:
+      for gap_left in valid.gap:
+        for gap_right in valid.gap:
+          for bound_right in valid.other:
+            let r = rendered(
+              new_template(TestLine(
+                expression: syntax.param,
+                name: "p",
+                bound_left: bound_left,
+                gap_left: gap_left,
+                gap_right: gap_right,
+                bound_right: bound_right
+              ).join()),
+              %* {"p": [value]}
+            )
+            check r == bound_left & value & bound_right
