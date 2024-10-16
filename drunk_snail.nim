@@ -150,9 +150,17 @@ func rendered(
           let e = t.expression
           if e.optional or not (e.name in params):
             continue
-          let n = len(params[e.name])
+          let n = block:
+            if params[e.name].kind == JArray:
+              len(params[e.name])
+            elif params[e.name].kind == JString:
+              1
+            else:
+              0
           if r == 1 or n < r:
             r = n
+          if r == 0:
+            break
       r
     for i in 0 ..< min_len:
       if i != 0:
@@ -165,11 +173,15 @@ func rendered(
           let e = t.expression
           if not (
             e.optional and (
-              (not (e.name in params)) or (params[e.name].kind != JArray) or
-              (len(params[e.name].elems) == 0)
+              (not (e.name in params)) or
+              (params[e.name].kind != JArray and params[e.name].kind != JString) or
+              (params[e.name].kind == JArray and len(params[e.name].elems) == 0)
             )
           ):
-            result &= params[e.name].elems[i].str
+            if params[e.name].kind == JArray:
+              result &= params[e.name].elems[i].str
+            elif params[e.name].kind == JString:
+              result &= params[e.name].str
       result &= external.right
   elif line.kind == lRef:
     let e = line.expression
@@ -222,7 +234,7 @@ proc test*() =
 
   check rendered(
     new_template "one <!-- (ref)r --> two",
-    %*{"r": [{"p": ["three"]}]},
+    %*{"r": [{"p": "three"}]},
     {"r": new_template "<!-- (param)p -->"}.to_table,
   ) == "one three two"
 
@@ -231,12 +243,12 @@ proc test*() =
 
   check rendered(
     new_template "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
-    %*{"p1": ["v1"], "p2": ["v2"]},
+    %*{"p1": "v1", "p2": "v2"},
   ) == "one v1 two v2 three"
 
   check rendered(
     new_template "one <!-- (ref)r --> two",
-    %*{"r": [{"p": ["three"]}, {"p": ["four"]}]},
+    %*{"r": [{"p": "three"}, {"p": "four"}]},
     {"r": new_template "<!-- (param)p -->"}.to_table,
   ) == "one three two\none four two"
 
@@ -307,7 +319,7 @@ proc test*() =
                 gap_right: gap_right,
                 bound_right: bound_right,
               ).join(),
-              %*{"p": [value]},
+              %*{"p": value},
             )
             check r == bound_left & value & bound_right
 
@@ -328,7 +340,7 @@ proc test*() =
                     bound_right: bound_right,
                     close_tag: close_tag,
                   ).join()
-                  let r = rendered(new_template l, %*{name: [value]})
+                  let r = rendered(new_template l, %*{name: value})
                   check r == l
 
   for `ref` in valid.`ref`:
@@ -348,7 +360,7 @@ proc test*() =
                   gap_right: gap_right,
                   bound_right: bound_right,
                 ).join(),
-                %*{"R": [{"p": [value]}]},
+                %*{"R": [{"p": value}]},
                 {"R": new_template `ref`}.to_table,
               )
               check r == bound_left & value & bound_right
