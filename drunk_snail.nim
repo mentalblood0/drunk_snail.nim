@@ -1,4 +1,5 @@
 import std/tables
+import std/times
 import std/sequtils
 import std/unittest
 import std/sugar
@@ -12,8 +13,7 @@ const close = "-->"
 
 func expression_regex(operator: static string): auto =
   return re2(
-    open & r" *(?P<optional>\(optional\))?\(" & operator &
-    r"\)(?P<name>[A-Za-z0-9]+) *" &
+    open & r" *(?P<optional>\(optional\))?\(" & operator & r"\)(?P<name>[A-Za-z0-9]+) *" &
       close
   )
 
@@ -59,8 +59,7 @@ type
   RenderError* = object of ValueError
 
 func new_expression(line: string, m: regex.RegexMatch2): Expression =
-  return (name: line[m.group("name")], optional: len(line[m.group(
-      "optional")]) > 0)
+  return (name: line[m.group("name")], optional: len(line[m.group("optional")]) > 0)
 
 func new_bounds(line: string, m: regex.RegexMatch2): Bounds =
   (line[0 ..< m.boundaries.a], line[m.boundaries.b + 1 .. ^1])
@@ -85,8 +84,7 @@ func new_line(line: string): Line =
   if len(refs) > 0:
     let r = refs[0]
     return
-      Line(kind: lRef, expression: new_expression(line, r), bounds: new_bounds(
-          line, r))
+      Line(kind: lRef, expression: new_expression(line, r), bounds: new_bounds(line, r))
   elif len(params) > 0:
     result = Line(kind: lParams)
     var b = 0
@@ -139,8 +137,9 @@ func rendered(
           let e = t.expression
           if not (
             e.optional and (
-              (not (e.name in params)) or (params[e.name].kind != JArray) or (
-                  len(params[e.name].elems) == 0))
+              (not (e.name in params)) or (params[e.name].kind != JArray) or
+              (len(params[e.name].elems) == 0)
+            )
           ):
             result &= params[e.name].elems[i].str
       result &= external.right
@@ -159,8 +158,7 @@ func rendered(
       else:
         raise new_exception(
           RenderError,
-          "Parameters for non-optional subtemplate `" & e.name &
-          "` not provided",
+          "Parameters for non-optional subtemplate `" & e.name & "` not provided",
         )
 
 func new_template*(text: string): Template =
@@ -178,48 +176,56 @@ func rendered*(
       result &= '\n'
     result &= rendered(l, params, templates, bounds)
 
-when is_main_module:
-
+proc test*() =
   check rendered(
     new_template "one <!-- (ref)r --> two",
-    %* {"r": [{}]},
+    %*{"r": [{}]},
     {"r": new_template("three")}.to_table,
   ) == "one three two"
 
   check rendered(
     new_template "<table>\n\t<!-- (ref)Row -->\n</table>",
-    %* {"Row": [{"cell": ["1.1", "2.1"]}, {"cell": ["1.2", "2.2"]}]},
+    %*{"Row": [{"cell": ["1.1", "2.1"]}, {"cell": ["1.2", "2.2"]}]},
     {"Row": new_template "<tr>\n\t<td><!-- (param)cell --></td>\n</tr>"}.to_table,
-  ) == "<table>\n\t<tr>\n\t\t<td>1.1</td>\n\t\t<td>2.1</td>\n\t</tr>\n\t<tr>\n\t\t<td>1.2</td>\n\t\t<td>2.2</td>\n\t</tr>\n</table>"
+  ) ==
+    "<table>\n\t<tr>\n\t\t<td>1.1</td>\n\t\t<td>2.1</td>\n\t</tr>\n\t<tr>\n\t\t<td>1.2</td>\n\t\t<td>2.2</td>\n\t</tr>\n</table>"
 
   check rendered(new_template "one <!-- (optional)(param)p1 --> two") == "one  two"
 
   check rendered(
     new_template "one <!-- (ref)r --> two",
-    %* {"r": [{"p": ["three"]}]},
+    %*{"r": [{"p": ["three"]}]},
     {"r": new_template "<!-- (param)p -->"}.to_table,
   ) == "one three two"
 
-  check rendered(new_template "one <!-- (param)p1 --> two", %* {"p1": ["v1",
-    "v2"]}) == "one v1 two\none v2 two"
+  check rendered(new_template "one <!-- (param)p1 --> two", %*{"p1": ["v1", "v2"]}) ==
+    "one v1 two\none v2 two"
 
   check rendered(
     new_template "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
-    %* {"p1": ["v1"], "p2": ["v2"]}) == "one v1 two v2 three"
+    %*{"p1": ["v1"], "p2": ["v2"]},
+  ) == "one v1 two v2 three"
 
   check rendered(
     new_template "one <!-- (ref)r --> two",
-    %* {"r": [{"p": ["three"]}, {"p": ["four"]}]},
+    %*{"r": [{"p": ["three"]}, {"p": ["four"]}]},
     {"r": new_template "<!-- (param)p -->"}.to_table,
   ) == "one three two\none four two"
 
-  check rendered(new_template "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
-      %*{"p1": ["v1", "v3"], "p2": ["v2", "v4", "v5"]}) == "one v1 two v2 three\none v3 two v4 three"
+  check rendered(
+    new_template "one <!-- (param)p1 --> two <!-- (param)p2 --> three",
+    %*{"p1": ["v1", "v3"], "p2": ["v2", "v4", "v5"]},
+  ) == "one v1 two v2 three\none v3 two v4 three"
 
-  const syntax* = (opening: open, close: close, optional: "(optional)",
-      param: "(param)", `ref`: "(ref)")
+  const syntax = (
+    opening: open,
+    close: close,
+    optional: "(optional)",
+    param: "(param)",
+    `ref`: "(ref)",
+  )
 
-  type TestLine* = ref object
+  type TestLine = ref object
     expression*: string
     name*: string
     bound_left*: string
@@ -230,21 +236,29 @@ when is_main_module:
     close_tag*: string = syntax.close
     bound_right*: string
 
-  func join*(l: TestLine): string = l.bound_left & l.open_tag & l.gap_left & l.flag &
-          l.expression & l.name & l.gap_right & l.close_tag & l.bound_right
+  func join(l: TestLine): string =
+    l.bound_left & l.open_tag & l.gap_left & l.flag & l.expression & l.name & l.gap_right &
+      l.close_tag & l.bound_right
 
-  const valid* = (other: ["", " ", "la"], gap: ["", " ", "  "], value: ["", "l",
-      "la", "\n"], `ref`: [syntax.opening & syntax.param & "p" &
-          syntax.close], one_line_params_number: [2, 3])
+  const valid = (
+    other: ["", " ", "la"],
+    gap: ["", " ", "  "],
+    value: ["", "l", "la", "\n"],
+    `ref`: [syntax.opening & syntax.param & "p" & syntax.close],
+    one_line_params_number: [2, 3],
+  )
 
-  const invalid* = (gap: ["l", "la"],
-    open_tag: block: collect:
-      for n in 1 .. len(syntax.opening):
-        $syntax.opening[0 ..< n],
-    close_tag: block: collect:
-      for n in 1 .. len(syntax.close):
-        $syntax.close[0 ..< n],
-    name: ["1", "-", "1l"]
+  const invalid = (
+    gap: ["l", "la"],
+    open_tag: block:
+      collect:
+        for n in 1 .. len(syntax.opening):
+          $syntax.opening[0 ..< n],
+    close_tag: block:
+      collect:
+        for n in 1 .. len(syntax.close):
+          $syntax.close[0 ..< n],
+    name: ["1", "-", "1l"],
   )
 
   for value in valid.value:
@@ -259,9 +273,9 @@ when is_main_module:
                 bound_left: bound_left,
                 gap_left: gap_left,
                 gap_right: gap_right,
-                bound_right: bound_right
+                bound_right: bound_right,
               ).join(),
-              %* {"p": [value]}
+              %*{"p": [value]},
             )
             check r == bound_left & value & bound_right
 
@@ -280,9 +294,9 @@ when is_main_module:
                     name: name,
                     gap_right: gap_right,
                     bound_right: bound_right,
-                    close_tag: close_tag
+                    close_tag: close_tag,
                   ).join()
-                  let r = rendered(new_template l, %* {name: [value]})
+                  let r = rendered(new_template l, %*{name: [value]})
                   check r == l
 
   for `ref` in valid.`ref`:
@@ -298,9 +312,40 @@ when is_main_module:
                   bound_left: bound_left,
                   gap_left: gap_left,
                   gap_right: gap_right,
-                  bound_right: bound_right
+                  bound_right: bound_right,
                 ).join(),
-                %* {"R": [{"p": [value]}]},
-                {"R": new_template `ref`}.to_table
+                %*{"R": [{"p": [value]}]},
+                {"R": new_template `ref`}.to_table,
               )
               check r == bound_left & value & bound_right
+
+proc benchmark*() =
+  let table = "<table>\n\t<!-- (ref)Row -->\n</table>".new_template
+  let templates =
+    {"Row": "<tr>\n\t<td><!-- (param)cell --></td>\n</tr>".new_template}.to_table
+
+  proc benchmark_table(size: int, n: int) =
+    let params = block:
+      var r = %*{"Row": []}
+      for y in 0 ..< size:
+        var rc = %*{"cell": []}
+        for x in 0 ..< size:
+          rc["cell"].elems.add(% $(x + y * size))
+        r["Row"].elems.add rc
+      r
+
+    let start_time = cpu_time()
+    for i in 0 ..< n:
+      discard table.rendered(params, templates)
+    let end_time = cpu_time()
+    echo "rendered " & $size & "x" & $size & " table in " &
+      $((end_time - start_time) / n.float) & " seconds (cpu time mean of " & $n &
+      " experiments)"
+
+  benchmark_table(10, 10000)
+  benchmark_table(100, 100)
+  benchmark_table(1000, 1)
+
+when is_main_module:
+  test()
+  benchmark()
