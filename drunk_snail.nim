@@ -1,3 +1,8 @@
+# Regular expression support is provided by the PCRE library package,
+# which is open source software, written by Philip Hazel, and copyright
+# by the University of Cambridge, England. Source can be found at
+# ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
+
 import std/tables
 import std/times
 import std/sequtils
