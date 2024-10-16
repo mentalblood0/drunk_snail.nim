@@ -1,4 +1,5 @@
 import std/tables
+import std/sequtils
 import std/unittest
 import std/sugar
 import std/json
@@ -239,27 +240,67 @@ when is_main_module:
   const invalid* = (gap: ["l", "la"],
     open_tag: block: collect:
       for n in 1 .. len(syntax.opening):
-        syntax.opening[0 ..< n],
+        $syntax.opening[0 ..< n],
     close_tag: block: collect:
       for n in 1 .. len(syntax.close):
-        syntax.close[0 ..< n],
+        $syntax.close[0 ..< n],
     name: ["1", "-", "1l"]
   )
 
   for value in valid.value:
-    for bound_left in valid.other:
+    for bound_left in concat(@(valid.other), @[syntax.opening]):
       for gap_left in valid.gap:
         for gap_right in valid.gap:
-          for bound_right in valid.other:
+          for bound_right in concat(@(valid.other), @[syntax.close]):
             let r = rendered(
-              new_template(TestLine(
+              new_template TestLine(
                 expression: syntax.param,
                 name: "p",
                 bound_left: bound_left,
                 gap_left: gap_left,
                 gap_right: gap_right,
                 bound_right: bound_right
-              ).join()),
+              ).join(),
               %* {"p": [value]}
             )
             check r == bound_left & value & bound_right
+
+  for value in valid.value:
+    for open_tag in invalid.open_tag:
+      for bound_left in valid.other:
+        for gap_left in invalid.gap:
+          for name in invalid.name:
+            for gap_right in invalid.gap:
+              for bound_right in valid.other:
+                for close_tag in invalid.close_tag:
+                  let l = TestLine(
+                    open_tag: open_tag,
+                    bound_left: bound_left,
+                    gap_left: gap_left,
+                    name: name,
+                    gap_right: gap_right,
+                    bound_right: bound_right,
+                    close_tag: close_tag
+                  ).join()
+                  let r = rendered(new_template l, %* {name: [value]})
+                  check r == l
+
+  for `ref` in valid.`ref`:
+    for value in valid.value:
+      for bound_left in valid.other:
+        for gap_left in valid.gap:
+          for gap_right in valid.gap:
+            for bound_right in valid.other:
+              let r = rendered(
+                new_template TestLine(
+                  expression: syntax.`ref`,
+                  name: "R",
+                  bound_left: bound_left,
+                  gap_left: gap_left,
+                  gap_right: gap_right,
+                  bound_right: bound_right
+                ).join(),
+                %* {"R": [{"p": [value]}]},
+                {"R": new_template `ref`}.to_table
+              )
+              check r == bound_left & value & bound_right
