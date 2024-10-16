@@ -71,6 +71,9 @@ Download and import drunk_snail.nim into your project
 
 ```nim
 import std/json
+import std/tables
+import std/unittest
+
 import drunk_snail
 
 check """<table>
