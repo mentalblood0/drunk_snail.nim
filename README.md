@@ -101,4 +101,4 @@ check """<table>
 
 ## Testing/Benchmarking
 
-Build drunk_snail.nim as main file and run, or call it's exported `test` and `benchmark` methods from another module
+Build [drunk_snail.nim](https://codeberg.org/mentalblood/drunk_snail.nim/src/branch/main/drunk_snail.nim) as main file and run, or call it's exported `test` and `benchmark` methods from another module
