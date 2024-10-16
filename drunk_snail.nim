@@ -228,12 +228,27 @@ proc test*() =
     {"r": new_template("three")}.to_table,
   ) == "one three two"
 
-  check rendered(
-    new_template "<table>\n\t<!-- (ref)Row -->\n</table>",
+  check """<table>
+    <!-- (ref)Row -->
+</table>""".new_template.rendered(
     %*{"Row": [{"cell": ["1.1", "2.1"]}, {"cell": ["1.2", "2.2"]}]},
-    {"Row": new_template "<tr>\n\t<td><!-- (param)cell --></td>\n</tr>"}.to_table,
+    {
+      "Row":
+        """<tr>
+    <td><!-- (param)cell --></td>
+</tr>""".new_template
+    }.to_table,
   ) ==
-    "<table>\n\t<tr>\n\t\t<td>1.1</td>\n\t\t<td>2.1</td>\n\t</tr>\n\t<tr>\n\t\t<td>1.2</td>\n\t\t<td>2.2</td>\n\t</tr>\n</table>"
+    """<table>
+    <tr>
+        <td>1.1</td>
+        <td>2.1</td>
+    </tr>
+    <tr>
+        <td>1.2</td>
+        <td>2.2</td>
+    </tr>
+</table>"""
 
   check rendered(new_template "one <!-- (optional)(param)p1 --> two") == "one  two"
 

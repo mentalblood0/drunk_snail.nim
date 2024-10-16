@@ -70,14 +70,15 @@ Download and import drunk_snail.nim into your project
 ## Usage
 
 ```nim
+import std/json
 import drunk_snail
 
 check """<table>
     <!-- (ref)Row -->
 </table>""".new_template.rendered(
-    params: %*{"Row": [{"cell": ["1.1", "2.1"]}, {"cell": ["1.2", "2.2"]}]},
-    templates: {
-        "Row": """<tr>
+    %*{"Row": [{"cell": ["1.1", "2.1"]}, {"cell": ["1.2", "2.2"]}]},
+    {
+      "Row": """<tr>
     <td><!-- (param)cell --></td>
 </tr>""".new_template
     }.to_table,
