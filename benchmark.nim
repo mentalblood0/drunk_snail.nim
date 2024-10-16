@@ -1,5 +1,6 @@
 import std/tables
 import std/times
+import std/json
 
 import drunk_snail as ds
 
@@ -9,12 +10,12 @@ let templates =
 
 proc benchmark_table(size: int, n: int) =
   let params = block:
-    var r = {"Row": @[].params_list}.to_table
+    var r = %* {"Row": []}
     for y in 0 ..< size:
-      var rc = {"cell": @[].values_list}.to_table
+      var rc = %* {"cell": []}
       for x in 0 ..< size:
-        rc["cell"].values_list.add $(x + y * size)
-      r["Row"].params_list.add rc
+        rc["cell"].elems.add( % $(x + y * size))
+      r["Row"].elems.add rc
     r
 
   let start_time = cpu_time()

@@ -1,4 +1,5 @@
 import std/tables
+import std/json
 import std/strutils
 
 import regex
@@ -8,7 +9,8 @@ const close = "-->"
 
 func expression_regex(operator: static string): auto =
   return re2(
-    open & r" *(?P<optional>\(optional\))?\(" & operator & r"\)(?P<name>[A-Za-z0-9]+) *" &
+    open & r" *(?P<optional>\(optional\))?\(" & operator &
+    r"\)(?P<name>[A-Za-z0-9]+) *" &
       close
   )
 
@@ -50,22 +52,12 @@ type
   Template* = tuple[lines: seq[Line]]
   Templates* = Table[string, Template]
 
-  Params* = Table[string, Value]
-  ValueKind = enum
-    vkValuesList
-    vkParamsList
-
-  Value* = ref ValueObj
-  ValueObj = object
-    case kind*: ValueKind
-    of vkValuesList: values_list*: seq[string]
-    of vkParamsList: params_list*: seq[Params]
-
   ParseError* = object of ValueError
   RenderError* = object of ValueError
 
 func new_expression(line: string, m: regex.RegexMatch2): Expression =
-  return (name: line[m.group("name")], optional: len(line[m.group("optional")]) > 0)
+  return (name: line[m.group("name")], optional: len(line[m.group(
+      "optional")]) > 0)
 
 func new_bounds(line: string, m: regex.RegexMatch2): Bounds =
   (line[0 ..< m.boundaries.a], line[m.boundaries.b + 1 .. ^1])
@@ -74,18 +66,6 @@ func `&`(a: Bounds, b: Bounds): Bounds =
   (b.left & a.left, a.right & b.right)
 func `&`(a: string, b: Bounds): string =
   b.left & a & b.right
-
-func values_list*(l: seq[string]): Value =
-  Value(kind: vkValuesList, values_list: l)
-
-func params_list*(l: seq[Params]): Value =
-  Value(kind: vkParamsList, params_list: l)
-
-func len(v: Value): int =
-  if v.kind == vkValuesList:
-    return len(v.values_list)
-  if v.kind == vkParamsList:
-    return len(v.params_list)
 
 func new_line(line: string): Line =
   let refs = find_all(line, ref_regex)
@@ -102,7 +82,8 @@ func new_line(line: string): Line =
   if len(refs) > 0:
     let r = refs[0]
     return
-      Line(kind: lRef, expression: new_expression(line, r), bounds: new_bounds(line, r))
+      Line(kind: lRef, expression: new_expression(line, r), bounds: new_bounds(
+          line, r))
   elif len(params) > 0:
     result = Line(kind: lParams)
     var b = 0
@@ -122,13 +103,13 @@ func new_line(line: string): Line =
 
 func rendered*(
   t: Template,
-  params: Params = Params(init_table[string, Value]()),
+  params: JsonNode = %*{},
   templates: Templates = Templates(init_table[string, Template]()),
   bounds: Bounds = ("", ""),
 ): string
 
 func rendered(
-    line: Line, params: Params, templates: Templates, external: Bounds
+    line: Line, params: JsonNode, templates: Templates, external: Bounds
 ): string =
   if line.kind == lPlain:
     return line.value & external
@@ -155,16 +136,15 @@ func rendered(
           let e = t.expression
           if not (
             e.optional and (
-              (not (e.name in params)) or (len(params[e.name]) == 0) or
-              (params[e.name].kind != vkValuesList)
-            )
+              (not (e.name in params)) or (params[e.name].kind != JArray) or (
+                  len(params[e.name].elems) == 0))
           ):
-            result &= params[e.name].values_list[i]
+            result &= params[e.name].elems[i].str
       result &= external.right
   elif line.kind == lRef:
     let e = line.expression
-    if (e.name in params) and (params[e.name].kind == vkParamsList):
-      for i, subparams in params[e.name].params_list:
+    if (e.name in params) and (params[e.name].kind == JArray):
+      for i, subparams in params[e.name].elems:
         if i != 0:
           result &= '\n'
         if not (e.optional and not (e.name in templates)):
@@ -176,7 +156,8 @@ func rendered(
       else:
         raise new_exception(
           RenderError,
-          "Parameters for non-optional subtemplate `" & e.name & "` not provided",
+          "Parameters for non-optional subtemplate `" & e.name &
+          "` not provided",
         )
 
 func new_template*(text: string): Template =
@@ -185,7 +166,7 @@ func new_template*(text: string): Template =
 
 func rendered*(
     t: Template,
-    params: Params = Params(init_table[string, Value]()),
+    params: JsonNode = %*{},
     templates: Templates = Templates(init_table[string, Template]()),
     bounds: Bounds = ("", ""),
 ): string =
