@@ -26,4 +26,6 @@ proc benchmark_table(size: int, n: int) =
     $((end_time - start_time) / n.float) & " seconds (cpu time mean of " & $n &
     " experiments)"
 
+benchmark_table(10, 10000)
 benchmark_table(100, 100)
+benchmark_table(1000, 1)
