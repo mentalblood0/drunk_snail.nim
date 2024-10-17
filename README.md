@@ -1,7 +1,5 @@
 <h1 align="center">🌪️ drunk snail</h1>
 
-<h3 align="center">safe and clean text template engine</h3>
-
 Pure [nim](https://nim-lang.org/) implementation of template language originally presented in [drunk snail](https://codeberg.org/mentalblood/drunk_snail)
 
 Uses standard library modules only
