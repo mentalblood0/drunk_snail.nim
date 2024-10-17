@@ -390,6 +390,14 @@ proc benchmark*() =
   let templates =
     {"Row": "<tr>\n\t<td><!-- (param)cell --></td>\n</tr>".new_template}.to_table
 
+  template bench(name: string, f: untyped, n: int) =
+    let start_time = cpu_time()
+    for i in 0 ..< n:
+      discard f
+    let end_time = cpu_time()
+    echo name & ": " & $((end_time - start_time) / n.float * 1000) &
+      " ms (cpu time mean of " & $n & " experiments)"
+
   proc benchmark_table(size: int, n: int) =
     let params = block:
       var r = %*{"Row": []}
@@ -400,17 +408,22 @@ proc benchmark*() =
         r["Row"].elems.add rc
       r
 
-    let start_time = cpu_time()
-    for i in 0 ..< n:
-      discard table.rendered(params, templates)
-    let end_time = cpu_time()
-    echo "rendered " & $size & "x" & $size & " table in " &
-      $((end_time - start_time) / n.float) & " seconds (cpu time mean of " & $n &
-      " experiments)"
+    bench($size & "x" & $size & " table", table.rendered(params, templates), n)
 
   benchmark_table(10, 10000)
   benchmark_table(100, 100)
   benchmark_table(1000, 1)
+
+  let list =
+    "<div>\n    <li id=\"<!-- (param)p -->\"></li><span></span></div>".new_template
+
+  proc benchmark_list(size: int, n: int) =
+    let params = %*{"p": to_seq(1 .. size).map(x => $x)}
+    bench($size & " elements list", list.rendered(params), n)
+
+  benchmark_list(1000, 1000)
+  benchmark_list(10000, 100)
+  benchmark_list(100000, 10)
 
 when is_main_module:
   test()
