@@ -1,6 +1,6 @@
 <h1 align="center">🌪️ drunk snail</h1>
 
-Pure [nim](https://nim-lang.org/) implementation of template language originally presented in [drunk snail](https://codeberg.org/mentalblood/drunk_snail)
+Pure [nim](https://nim-lang.org/) implementation of template language originally presented in [drunk snail](https://github.com/mentalblood0/drunk_snail)
 
 Uses standard library modules only
 
@@ -65,7 +65,7 @@ Result:
 
 ## Installation
 
-Download and import [drunk_snail.nim](https://codeberg.org/mentalblood/drunk_snail.nim/src/branch/main/drunk_snail.nim) into your project
+Download and import [drunk_snail.nim](https://github.com/mentalblood0/drunk_snail.nim/blob/main/drunk_snail.nim) into your project
 
 ## Usage
 
@@ -99,4 +99,4 @@ check """<table>
 
 ## Testing/Benchmarking
 
-Build [drunk_snail.nim](https://codeberg.org/mentalblood/drunk_snail.nim/src/branch/main/drunk_snail.nim) as main file and run, or call it's exported `test` and `benchmark` methods from another module
+Build [drunk_snail.nim](https://github.com/mentalblood0/drunk_snail.nim/blob/main/drunk_snail.nim) as main file and run, or call it's exported `test` and `benchmark` methods from another module
