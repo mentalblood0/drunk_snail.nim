@@ -135,18 +135,23 @@ func new_line(parser: Parser, line: string): Line =
   else:
     return Line(kind: lPlain, value: line)
 
-func rendered*(
+proc render(
+  output: var string,
   t: Template,
   params: JsonNode = %*{},
   templates: Templates = Templates(init_table[string, Template]()),
   bounds: Bounds = ("", ""),
-): string
+)
 
-func rendered(
-    line: Line, params: JsonNode, templates: Templates, external: Bounds
-): string =
+proc render(
+    output: var string,
+    line: Line,
+    params: JsonNode,
+    templates: Templates,
+    external: Bounds,
+) =
   if line.kind == lPlain:
-    return line.value & external
+    output &= line.value & external
   elif line.kind == lParams:
     let min_len = block:
       var r = 1
@@ -169,11 +174,11 @@ func rendered(
       r
     for i in 0 ..< min_len:
       if i != 0:
-        result &= '\n'
-      result &= external.left
+        output &= '\n'
+      output &= external.left
       for t in line.tokens:
         if t.kind == pltPlain:
-          result &= t.value
+          output &= t.value
         elif t.kind == pltParam:
           let e = t.expression
           if not (
@@ -184,22 +189,23 @@ func rendered(
             )
           ):
             if params[e.name].kind == JArray:
-              result &= params[e.name].elems[i].str
+              output &= params[e.name].elems[i].str
             elif params[e.name].kind == JString:
-              result &= params[e.name].str
-      result &= external.right
+              output &= params[e.name].str
+      output &= external.right
   elif line.kind == lRef:
     let e = line.expression
     if (e.name in params) and (params[e.name].kind == JArray):
       for i, subparams in params[e.name].elems:
         if i != 0:
-          result &= '\n'
+          output &= '\n'
         if not (e.optional and not (e.name in templates)):
-          result &=
-            rendered(templates[e.name], subparams, templates, line.bounds & external)
+          render(
+            output, templates[e.name], subparams, templates, line.bounds & external
+          )
     else:
       if e.optional:
-        return ""
+        output &= ""
       else:
         raise new_exception(
           RenderError,
@@ -210,7 +216,19 @@ func new_template*(text: string, parser: Parser = new_parser()): Template =
   for l in split_lines text:
     result.lines.add parser.new_line l
 
-func rendered*(
+proc render(
+    output: var string,
+    t: Template,
+    params: JsonNode = %*{},
+    templates: Templates = Templates(init_table[string, Template]()),
+    bounds: Bounds = ("", ""),
+) =
+  for i, l in t.lines:
+    if i != 0:
+      output &= '\n'
+    render(output, l, params, templates, bounds)
+
+proc rendered*(
     t: Template,
     params: JsonNode = %*{},
     templates: Templates = Templates(init_table[string, Template]()),
@@ -219,7 +237,7 @@ func rendered*(
   for i, l in t.lines:
     if i != 0:
       result &= '\n'
-    result &= rendered(l, params, templates, bounds)
+    render(result, l, params, templates, bounds)
 
 proc test*() =
   check rendered(
